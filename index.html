@@ -38,8 +38,6 @@
   @media (max-width:480px){
     .wrap{padding:32px 16px 80px;}
   }
-
-  /* header */
   header{
     display:flex;
     justify-content:space-between;
@@ -83,13 +81,12 @@
     transition:border-color .15s, color .15s;
     flex-shrink:0;
   }
+  .gear.connected{border-color:#7fd1a0; color:#7fd1a0;}
   .gear:hover{color:var(--paper); border-color:var(--line-strong);}
   .gear:focus-visible, button:focus-visible, textarea:focus-visible, input:focus-visible{
     outline:2px solid var(--amber);
     outline-offset:2px;
   }
-
-  /* recorder card */
   .recorder{
     background:var(--panel);
     border:1px solid var(--line);
@@ -147,7 +144,6 @@
   @media (prefers-reduced-motion: reduce){
     .rec-btn.active .rec-ring{animation:none; opacity:.4;}
   }
-
   .rec-meta{flex:1; min-width:0;}
   .rec-status{
     font-size:14px;
@@ -159,7 +155,6 @@
     font-size:12px;
     color:var(--mist);
   }
-
   .meter{
     display:flex;
     align-items:flex-end;
@@ -175,7 +170,6 @@
     transition:height .08s linear, background .2s;
   }
   .meter.live span{background:var(--amber);}
-
   textarea.transcript{
     width:100%;
     margin-top:22px;
@@ -191,7 +185,6 @@
     resize:vertical;
   }
   textarea.transcript::placeholder{color:var(--mist);}
-
   .save-row{
     display:flex;
     justify-content:flex-end;
@@ -215,11 +208,14 @@
     border-color:var(--amber);
     color:#1a1305;
   }
+  .btn.danger{
+    color:var(--pulse);
+    border-color:var(--pulse);
+  }
+  .btn.danger:not(:disabled):hover{background:rgba(232,101,79,0.12);}
   .btn:disabled{opacity:.4; cursor:not-allowed;}
   .btn:not(:disabled):hover{background:var(--line);}
   .btn.primary:not(:disabled):hover{background:#f0ae52;}
-
-  /* log */
   .log-head{
     display:flex;
     align-items:baseline;
@@ -237,7 +233,6 @@
     font-size:12px;
     color:var(--mist);
   }
-
   .log{
     position:relative;
     padding-left:22px;
@@ -293,8 +288,6 @@
     font-size:13px;
     margin-top:8px;
   }
-
-  /* settings modal */
   .overlay{
     position:fixed; inset:0;
     background:rgba(10,11,15,0.7);
@@ -347,9 +340,14 @@
   }
   .modal-actions{
     display:flex;
-    justify-content:flex-end;
+    justify-content:space-between;
+    align-items:center;
     gap:10px;
     margin-top:20px;
+  }
+  .modal-actions-right{
+    display:flex;
+    gap:10px;
   }
   .modal-status{
     font-size:12px;
@@ -406,7 +404,7 @@
 <div class="overlay" id="overlay">
   <div class="modal">
     <h3>Connect Supabase</h3>
-    <p>Paste your project URL and anon key. Stored only in this artifact's private storage — never sent anywhere but your own database.</p>
+    <p>Paste your project URL and anon key. Stored in this artifact's private storage so you won't need to re-enter it next time you open the site.</p>
     <div class="field">
       <label for="sbUrl">Project URL</label>
       <input id="sbUrl" type="text" placeholder="https://xxxx.supabase.co" autocomplete="off">
@@ -416,8 +414,11 @@
       <input id="sbKey" type="text" placeholder="eyJhbGciOi..." autocomplete="off">
     </div>
     <div class="modal-actions">
-      <button class="btn" id="closeModal" type="button">Cancel</button>
-      <button class="btn primary" id="saveConfig" type="button">Connect</button>
+      <button class="btn danger" id="disconnectBtn" type="button" style="display:none;">Disconnect</button>
+      <div class="modal-actions-right">
+        <button class="btn" id="closeModal" type="button">Cancel</button>
+        <button class="btn primary" id="saveConfig" type="button">Connect</button>
+      </div>
     </div>
     <p class="modal-status" id="modalStatus"></p>
   </div>
@@ -437,11 +438,17 @@
   const settingsBtn = document.getElementById('settingsBtn');
   const closeModal = document.getElementById('closeModal');
   const saveConfigBtn = document.getElementById('saveConfig');
+  const disconnectBtn = document.getElementById('disconnectBtn');
   const modalStatus = document.getElementById('modalStatus');
   const sbUrlInput = document.getElementById('sbUrl');
   const sbKeyInput = document.getElementById('sbKey');
 
-  function openModal(){ overlay.classList.add('open'); modalStatus.textContent=''; modalStatus.className='modal-status'; }
+  function openModal(){
+    overlay.classList.add('open');
+    modalStatus.textContent='';
+    modalStatus.className='modal-status';
+    disconnectBtn.style.display = sb ? 'inline-block' : 'none';
+  }
   function closeModalFn(){ overlay.classList.remove('open'); }
   settingsBtn.addEventListener('click', openModal);
   closeModal.addEventListener('click', closeModalFn);
@@ -451,8 +458,22 @@
     try{
       sb = window.supabase.createClient(url, key);
       sbUrl = url; sbKey = key;
+      settingsBtn.classList.add('connected');
       return true;
     }catch(e){ return false; }
+  }
+
+  async function persistConfig(url, key){
+    try{
+      const result = await window.storage.set('supabase-config', JSON.stringify({url, key}));
+      if(!result){
+        console.error('Storage returned no result while saving Supabase config.');
+      }
+      return !!result;
+    }catch(e){
+      console.error('Failed to persist Supabase config:', e);
+      return false;
+    }
   }
 
   async function loadConfig(){
@@ -463,11 +484,14 @@
         if(cfg.url && cfg.key){
           sbUrlInput.value = cfg.url;
           sbKeyInput.value = cfg.key;
-          initClient(cfg.url, cfg.key);
-          fetchEntries();
+          if(initClient(cfg.url, cfg.key)){
+            fetchEntries();
+          }
         }
       }
-    }catch(e){ /* no config yet */ }
+    }catch(e){
+      // no config saved yet — that's fine, just start empty
+    }
   }
 
   saveConfigBtn.addEventListener('click', async ()=>{
@@ -483,20 +507,43 @@
       modalStatus.className = 'modal-status bad';
       return;
     }
-    // test connection
+
+    // Persist immediately so the credentials are saved for next time,
+    // regardless of whether the test query below succeeds. This is the
+    // fix: previously the config only saved after a successful query,
+    // so a failing test query (e.g. table not created yet) meant the
+    // keys never got remembered.
+    const saved = await persistConfig(url, key);
+
+    // test connection (informational only — doesn't block persistence)
     const { error } = await sb.from('journal_entries').select('id').limit(1);
     if(error){
-      modalStatus.textContent = 'Connected, but query failed: ' + error.message;
+      modalStatus.textContent = saved
+        ? 'Saved. Connected, but query failed: ' + error.message
+        : 'Connected, but query failed: ' + error.message;
       modalStatus.className = 'modal-status bad';
     }else{
       modalStatus.textContent = 'Connected.';
       modalStatus.className = 'modal-status ok';
-      try{
-        await window.storage.set('supabase-config', JSON.stringify({url, key}));
-      }catch(e){}
       fetchEntries();
+      disconnectBtn.style.display = 'inline-block';
       setTimeout(closeModalFn, 700);
     }
+  });
+
+  disconnectBtn.addEventListener('click', async ()=>{
+    try{
+      await window.storage.delete('supabase-config');
+    }catch(e){ /* nothing stored — fine */ }
+    sb = null; sbUrl=''; sbKey='';
+    sbUrlInput.value = '';
+    sbKeyInput.value = '';
+    settingsBtn.classList.remove('connected');
+    disconnectBtn.style.display = 'none';
+    logEl.innerHTML = '<p class="empty">Connect your database to see past entries.</p>';
+    logCountEl.textContent = '';
+    modalStatus.textContent = 'Disconnected.';
+    modalStatus.className = 'modal-status ok';
   });
 
   // ---------- Recording ----------
@@ -532,7 +579,7 @@
   function setActiveUI(){
     recBtn.classList.add('active');
     recBtn.setAttribute('aria-label','Stop recording');
-    recStatus.textContent = 'Listening…';
+    recStatus.textContent = 'Listening...';
     recHint.textContent = 'Tap again to stop';
     meterEl.classList.add('live');
   }
@@ -630,7 +677,7 @@
     if(!transcript && !audioBlob) return;
 
     saveBtn.disabled = true;
-    saveBtn.textContent = 'Saving…';
+    saveBtn.textContent = 'Saving...';
 
     let audio_url = null;
     if(audioBlob){
