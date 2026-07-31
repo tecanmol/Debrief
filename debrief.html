@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Debrief — daily voice log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --ink:#12141c;
+    --panel:#1b1e29;
+    --panel-raised:#22263380;
+    --paper:#f3efe6;
+    --mist:#8a8fa3;
+    --amber:#e8a33d;
+    --pulse:#e8654f;
+    --line: rgba(243,239,230,0.09);
+    --line-strong: rgba(243,239,230,0.16);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -10%, #232739 0%, transparent 60%),
+      var(--ink);
+    color:var(--paper);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    max-width:640px;
+    margin:0 auto;
+    padding:48px 20px 100px;
+  }
+  @media (max-width:480px){
+    .wrap{padding:32px 16px 80px;}
+  }
+
+  /* header */
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-bottom:40px;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--amber);
+    margin:0 0 10px;
+  }
+  h1{
+    font-family:'Fraunces',serif;
+    font-optical-sizing:auto;
+    font-weight:600;
+    font-size:38px;
+    line-height:1;
+    margin:0 0 8px;
+    letter-spacing:-0.01em;
+  }
+  .subdate{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    color:var(--mist);
+  }
+  .gear{
+    background:none;
+    border:1px solid var(--line-strong);
+    color:var(--mist);
+    width:38px;
+    height:38px;
+    border-radius:10px;
+    cursor:pointer;
+    font-size:16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:border-color .15s, color .15s;
+    flex-shrink:0;
+  }
+  .gear:hover{color:var(--paper); border-color:var(--line-strong);}
+  .gear:focus-visible, button:focus-visible, textarea:focus-visible, input:focus-visible{
+    outline:2px solid var(--amber);
+    outline-offset:2px;
+  }
+
+  /* recorder card */
+  .recorder{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:28px 24px;
+    margin-bottom:44px;
+  }
+  .rec-row{
+    display:flex;
+    align-items:center;
+    gap:20px;
+  }
+  .rec-btn{
+    position:relative;
+    flex-shrink:0;
+    width:64px;
+    height:64px;
+    border-radius:50%;
+    border:none;
+    cursor:pointer;
+    background:var(--paper);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:background .2s, transform .1s;
+  }
+  .rec-btn:active{transform:scale(0.96);}
+  .rec-btn .dot{
+    width:20px;
+    height:20px;
+    border-radius:50%;
+    background:var(--pulse);
+    transition:border-radius .2s, width .2s, height .2s;
+  }
+  .rec-btn.active .dot{
+    border-radius:5px;
+    width:18px;
+    height:18px;
+  }
+  .rec-btn.active{background:var(--paper);}
+  .rec-ring{
+    position:absolute;
+    inset:-8px;
+    border-radius:50%;
+    border:1.5px solid var(--pulse);
+    opacity:0;
+  }
+  .rec-btn.active .rec-ring{
+    animation:pulseRing 1.6s ease-out infinite;
+  }
+  @keyframes pulseRing{
+    0%{opacity:.7; transform:scale(0.9);}
+    100%{opacity:0; transform:scale(1.5);}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .rec-btn.active .rec-ring{animation:none; opacity:.4;}
+  }
+
+  .rec-meta{flex:1; min-width:0;}
+  .rec-status{
+    font-size:14px;
+    font-weight:500;
+    margin-bottom:4px;
+  }
+  .rec-hint{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--mist);
+  }
+
+  .meter{
+    display:flex;
+    align-items:flex-end;
+    gap:3px;
+    height:28px;
+    margin-left:auto;
+  }
+  .meter span{
+    width:3px;
+    background:var(--mist);
+    border-radius:2px;
+    height:4px;
+    transition:height .08s linear, background .2s;
+  }
+  .meter.live span{background:var(--amber);}
+
+  textarea.transcript{
+    width:100%;
+    margin-top:22px;
+    background:transparent;
+    border:1px solid var(--line);
+    border-radius:12px;
+    color:var(--paper);
+    font-family:'Inter',sans-serif;
+    font-size:15px;
+    line-height:1.55;
+    padding:14px 16px;
+    min-height:90px;
+    resize:vertical;
+  }
+  textarea.transcript::placeholder{color:var(--mist);}
+
+  .save-row{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:16px;
+  }
+  .btn{
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    font-weight:600;
+    padding:10px 18px;
+    border-radius:9px;
+    cursor:pointer;
+    border:1px solid var(--line-strong);
+    background:transparent;
+    color:var(--paper);
+    transition:background .15s, opacity .15s;
+  }
+  .btn.primary{
+    background:var(--amber);
+    border-color:var(--amber);
+    color:#1a1305;
+  }
+  .btn:disabled{opacity:.4; cursor:not-allowed;}
+  .btn:not(:disabled):hover{background:var(--line);}
+  .btn.primary:not(:disabled):hover{background:#f0ae52;}
+
+  /* log */
+  .log-head{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:18px;
+  }
+  .log-head h2{
+    font-family:'Fraunces',serif;
+    font-weight:500;
+    font-size:20px;
+    margin:0;
+  }
+  .log-count{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--mist);
+  }
+
+  .log{
+    position:relative;
+    padding-left:22px;
+  }
+  .log::before{
+    content:'';
+    position:absolute;
+    left:5px; top:6px; bottom:6px;
+    width:1px;
+    background:var(--line-strong);
+  }
+  .entry{
+    position:relative;
+    padding-bottom:26px;
+  }
+  .entry:last-child{padding-bottom:0;}
+  .entry::before{
+    content:'';
+    position:absolute;
+    left:-22px; top:5px;
+    width:9px; height:9px;
+    border-radius:50%;
+    background:var(--amber);
+    border:2px solid var(--ink);
+  }
+  .entry-date{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--amber);
+    letter-spacing:.04em;
+    margin-bottom:6px;
+  }
+  .entry-text{
+    font-size:15px;
+    line-height:1.6;
+    color:var(--paper);
+    white-space:pre-wrap;
+    margin-bottom:8px;
+  }
+  audio{
+    width:100%;
+    height:32px;
+    filter:invert(1) grayscale(1) brightness(1.6);
+    border-radius:8px;
+  }
+  .empty{
+    color:var(--mist);
+    font-size:14px;
+    padding:8px 0 0;
+  }
+  .load-err{
+    color:var(--pulse);
+    font-size:13px;
+    margin-top:8px;
+  }
+
+  /* settings modal */
+  .overlay{
+    position:fixed; inset:0;
+    background:rgba(10,11,15,0.7);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    z-index:10;
+  }
+  .overlay.open{display:flex;}
+  .modal{
+    background:var(--panel);
+    border:1px solid var(--line-strong);
+    border-radius:16px;
+    padding:26px;
+    width:100%;
+    max-width:400px;
+  }
+  .modal h3{
+    font-family:'Fraunces',serif;
+    font-size:19px;
+    margin:0 0 6px;
+    font-weight:600;
+  }
+  .modal p{
+    font-size:13px;
+    color:var(--mist);
+    margin:0 0 18px;
+    line-height:1.5;
+  }
+  .field{margin-bottom:14px;}
+  .field label{
+    display:block;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--mist);
+    margin-bottom:6px;
+  }
+  .field input{
+    width:100%;
+    background:var(--ink);
+    border:1px solid var(--line-strong);
+    border-radius:9px;
+    padding:10px 12px;
+    color:var(--paper);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+  }
+  .modal-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:20px;
+  }
+  .modal-status{
+    font-size:12px;
+    margin-top:10px;
+    min-height:16px;
+  }
+  .modal-status.ok{color:#7fd1a0;}
+  .modal-status.bad{color:var(--pulse);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <p class="eyebrow">Daily debrief</p>
+      <h1>What happened today</h1>
+      <p class="subdate" id="todayLabel"></p>
+    </div>
+    <button class="gear" id="settingsBtn" title="Supabase settings" aria-label="Settings">⚙</button>
+  </header>
+
+  <section class="recorder">
+    <div class="rec-row">
+      <button class="rec-btn" id="recBtn" aria-label="Start recording">
+        <span class="rec-ring"></span>
+        <span class="dot"></span>
+      </button>
+      <div class="rec-meta">
+        <div class="rec-status" id="recStatus">Ready when you are</div>
+        <div class="rec-hint" id="recHint">Tap to talk through your day</div>
+      </div>
+      <div class="meter" id="meter">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </div>
+    <textarea class="transcript" id="transcript" placeholder="Your words land here as you talk — or just type it out."></textarea>
+    <div class="save-row">
+      <button class="btn" id="discardBtn" type="button">Discard</button>
+      <button class="btn primary" id="saveBtn" type="button" disabled>Save entry</button>
+    </div>
+  </section>
+
+  <section>
+    <div class="log-head">
+      <h2>The log</h2>
+      <span class="log-count" id="logCount"></span>
+    </div>
+    <div class="log" id="log">
+      <p class="empty">Connect your database to see past entries.</p>
+    </div>
+  </section>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3>Connect Supabase</h3>
+    <p>Paste your project URL and anon key. Stored only in this artifact's private storage — never sent anywhere but your own database.</p>
+    <div class="field">
+      <label for="sbUrl">Project URL</label>
+      <input id="sbUrl" type="text" placeholder="https://xxxx.supabase.co" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="sbKey">Anon public key</label>
+      <input id="sbKey" type="text" placeholder="eyJhbGciOi..." autocomplete="off">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="closeModal" type="button">Cancel</button>
+      <button class="btn primary" id="saveConfig" type="button">Connect</button>
+    </div>
+    <p class="modal-status" id="modalStatus"></p>
+  </div>
+</div>
+
+<script>
+(function(){
+  const todayLabelEl = document.getElementById('todayLabel');
+  const today = new Date();
+  todayLabelEl.textContent = today.toLocaleDateString(undefined,{weekday:'long', month:'long', day:'numeric', year:'numeric'});
+
+  // ---------- Supabase config (persisted via artifact storage) ----------
+  let sb = null;
+  let sbUrl = '', sbKey = '';
+
+  const overlay = document.getElementById('overlay');
+  const settingsBtn = document.getElementById('settingsBtn');
+  const closeModal = document.getElementById('closeModal');
+  const saveConfigBtn = document.getElementById('saveConfig');
+  const modalStatus = document.getElementById('modalStatus');
+  const sbUrlInput = document.getElementById('sbUrl');
+  const sbKeyInput = document.getElementById('sbKey');
+
+  function openModal(){ overlay.classList.add('open'); modalStatus.textContent=''; modalStatus.className='modal-status'; }
+  function closeModalFn(){ overlay.classList.remove('open'); }
+  settingsBtn.addEventListener('click', openModal);
+  closeModal.addEventListener('click', closeModalFn);
+  overlay.addEventListener('click', (e)=>{ if(e.target===overlay) closeModalFn(); });
+
+  function initClient(url, key){
+    try{
+      sb = window.supabase.createClient(url, key);
+      sbUrl = url; sbKey = key;
+      return true;
+    }catch(e){ return false; }
+  }
+
+  async function loadConfig(){
+    try{
+      const res = await window.storage.get('supabase-config');
+      if(res && res.value){
+        const cfg = JSON.parse(res.value);
+        if(cfg.url && cfg.key){
+          sbUrlInput.value = cfg.url;
+          sbKeyInput.value = cfg.key;
+          initClient(cfg.url, cfg.key);
+          fetchEntries();
+        }
+      }
+    }catch(e){ /* no config yet */ }
+  }
+
+  saveConfigBtn.addEventListener('click', async ()=>{
+    const url = sbUrlInput.value.trim();
+    const key = sbKeyInput.value.trim();
+    if(!url || !key){
+      modalStatus.textContent = 'Both fields are required.';
+      modalStatus.className = 'modal-status bad';
+      return;
+    }
+    if(!initClient(url, key)){
+      modalStatus.textContent = 'Could not create client — check the URL.';
+      modalStatus.className = 'modal-status bad';
+      return;
+    }
+    // test connection
+    const { error } = await sb.from('journal_entries').select('id').limit(1);
+    if(error){
+      modalStatus.textContent = 'Connected, but query failed: ' + error.message;
+      modalStatus.className = 'modal-status bad';
+    }else{
+      modalStatus.textContent = 'Connected.';
+      modalStatus.className = 'modal-status ok';
+      try{
+        await window.storage.set('supabase-config', JSON.stringify({url, key}));
+      }catch(e){}
+      fetchEntries();
+      setTimeout(closeModalFn, 700);
+    }
+  });
+
+  // ---------- Recording ----------
+  const recBtn = document.getElementById('recBtn');
+  const recStatus = document.getElementById('recStatus');
+  const recHint = document.getElementById('recHint');
+  const transcriptEl = document.getElementById('transcript');
+  const saveBtn = document.getElementById('saveBtn');
+  const discardBtn = document.getElementById('discardBtn');
+  const meterEl = document.getElementById('meter');
+  const meterBars = meterEl.querySelectorAll('span');
+
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let audioBlob = null;
+  let stream = null;
+  let recognizing = false;
+  let recognition = null;
+  let audioCtx, analyser, rafId;
+  let baseTranscript = '';
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  function setIdleUI(){
+    recBtn.classList.remove('active');
+    recBtn.setAttribute('aria-label','Start recording');
+    recStatus.textContent = 'Ready when you are';
+    recHint.textContent = SpeechRecognition ? 'Tap to talk through your day' : 'Tap to record — type your notes below';
+    meterEl.classList.remove('live');
+    meterBars.forEach(b=>b.style.height='4px');
+  }
+
+  function setActiveUI(){
+    recBtn.classList.add('active');
+    recBtn.setAttribute('aria-label','Stop recording');
+    recStatus.textContent = 'Listening…';
+    recHint.textContent = 'Tap again to stop';
+    meterEl.classList.add('live');
+  }
+
+  async function startRecording(){
+    try{
+      stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    }catch(e){
+      recStatus.textContent = 'Microphone access denied';
+      return;
+    }
+
+    audioChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = (e)=> audioChunks.push(e.data);
+    mediaRecorder.onstop = ()=>{
+      audioBlob = new Blob(audioChunks, {type:'audio/webm'});
+      saveBtn.disabled = transcriptEl.value.trim().length===0 && !audioBlob;
+    };
+    mediaRecorder.start();
+
+    // waveform meter
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    const src = audioCtx.createMediaStreamSource(stream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 64;
+    src.connect(analyser);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    function draw(){
+      analyser.getByteFrequencyData(data);
+      meterBars.forEach((bar,i)=>{
+        const v = data[i*3] || 0;
+        bar.style.height = Math.max(4, (v/255)*28) + 'px';
+      });
+      rafId = requestAnimationFrame(draw);
+    }
+    draw();
+
+    // speech-to-text
+    baseTranscript = transcriptEl.value ? transcriptEl.value + ' ' : '';
+    if(SpeechRecognition){
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      recognition.onresult = (e)=>{
+        let interim = '', final = '';
+        for(let i=e.resultIndex;i<e.results.length;i++){
+          const t = e.results[i][0].transcript;
+          if(e.results[i].isFinal) final += t;
+          else interim += t;
+        }
+        if(final) baseTranscript += final;
+        transcriptEl.value = (baseTranscript + interim).trim();
+      };
+      recognition.onerror = ()=>{};
+      recognition.onend = ()=>{ if(recognizing){ try{ recognition.start(); }catch(e){} } };
+      recognition.start();
+      recognizing = true;
+    }
+
+    setActiveUI();
+  }
+
+  function stopRecording(){
+    if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    if(stream) stream.getTracks().forEach(t=>t.stop());
+    if(recognition){ recognizing = false; recognition.stop(); }
+    if(rafId) cancelAnimationFrame(rafId);
+    if(audioCtx) audioCtx.close();
+    setIdleUI();
+    saveBtn.disabled = transcriptEl.value.trim().length===0;
+  }
+
+  recBtn.addEventListener('click', ()=>{
+    if(recBtn.classList.contains('active')) stopRecording();
+    else startRecording();
+  });
+
+  transcriptEl.addEventListener('input', ()=>{
+    saveBtn.disabled = transcriptEl.value.trim().length===0;
+  });
+
+  discardBtn.addEventListener('click', ()=>{
+    if(recBtn.classList.contains('active')) stopRecording();
+    transcriptEl.value = '';
+    audioBlob = null;
+    saveBtn.disabled = true;
+  });
+
+  // ---------- Save to Supabase ----------
+  saveBtn.addEventListener('click', async ()=>{
+    if(!sb){ openModal(); return; }
+    const transcript = transcriptEl.value.trim();
+    if(!transcript && !audioBlob) return;
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+
+    let audio_url = null;
+    if(audioBlob){
+      const filename = `${new Date().toISOString().replace(/[:.]/g,'-')}.webm`;
+      const { data: upData, error: upErr } = await sb.storage
+        .from('voice-notes')
+        .upload(filename, audioBlob, { contentType:'audio/webm' });
+      if(!upErr){
+        const { data: pub } = sb.storage.from('voice-notes').getPublicUrl(filename);
+        audio_url = pub.publicUrl;
+      }
+    }
+
+    const { error } = await sb.from('journal_entries').insert({
+      entry_date: new Date().toISOString().slice(0,10),
+      transcript: transcript || null,
+      audio_url
+    });
+
+    saveBtn.textContent = 'Save entry';
+    if(error){
+      recStatus.textContent = 'Save failed: ' + error.message;
+    }else{
+      transcriptEl.value = '';
+      audioBlob = null;
+      fetchEntries();
+    }
+    saveBtn.disabled = true;
+  });
+
+  // ---------- Load & render log ----------
+  const logEl = document.getElementById('log');
+  const logCountEl = document.getElementById('logCount');
+
+  async function fetchEntries(){
+    if(!sb) return;
+    const { data, error } = await sb
+      .from('journal_entries')
+      .select('*')
+      .order('created_at', {ascending:false})
+      .limit(100);
+
+    if(error){
+      logEl.innerHTML = `<p class="load-err">Could not load entries: ${error.message}</p>`;
+      return;
+    }
+    if(!data || data.length===0){
+      logEl.innerHTML = `<p class="empty">No entries yet. Hit record and tell today what happened.</p>`;
+      logCountEl.textContent = '';
+      return;
+    }
+    logCountEl.textContent = `${data.length} entr${data.length===1?'y':'ies'}`;
+    logEl.innerHTML = data.map(row=>{
+      const d = new Date(row.entry_date + 'T00:00:00');
+      const dateStr = d.toLocaleDateString(undefined,{weekday:'short', month:'short', day:'numeric', year:'numeric'});
+      const text = row.transcript ? `<div class="entry-text">${escapeHtml(row.transcript)}</div>` : '';
+      const audio = row.audio_url ? `<audio controls src="${row.audio_url}"></audio>` : '';
+      return `<div class="entry">
+        <div class="entry-date">${dateStr}</div>
+        ${text}
+        ${audio}
+      </div>`;
+    }).join('');
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  setIdleUI();
+  loadConfig();
+})();
+</script>
+</body>
+</html>
