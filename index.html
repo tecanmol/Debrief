@@ -430,12 +430,9 @@
   todayLabelEl.textContent = today.toLocaleDateString(undefined,{weekday:'long', month:'long', day:'numeric', year:'numeric'});
 
   // ---------- Supabase config ----------
-  // Baked-in defaults so this file works the same on every device without re-entering config.
-  // Safe to keep here since access is scoped by the RLS policies on journal_entries / voice-notes —
-  // just don't post this file somewhere public.
-  const DEFAULT_SB_URL = 'https://yuvzhcpxkelwdadohjma.supabase.co';
-  const DEFAULT_SB_KEY = 'sb_publishable_l0FYckb0nq9kn6QNs5Jh6g_EFDj91Gz';
-
+  // No credentials are hardcoded here on purpose — this file is deployed publicly on GitHub Pages.
+  // Enter your Project URL + key once via the gear icon on each device; they're saved in this
+  // browser's localStorage (private to this device/browser, never sent anywhere but Supabase).
   let sb = null;
   let sbUrl = '', sbKey = '';
 
@@ -462,16 +459,6 @@
   }
 
   function loadConfig(){
-    // 1) baked-in defaults — this is what makes the file work on any device with no setup step
-    if(DEFAULT_SB_URL && DEFAULT_SB_KEY){
-      sbUrlInput.value = DEFAULT_SB_URL;
-      sbKeyInput.value = DEFAULT_SB_KEY;
-      if(initClient(DEFAULT_SB_URL, DEFAULT_SB_KEY)){
-        fetchEntries();
-        return;
-      }
-    }
-    // 2) fall back to a manually-saved override, e.g. if you connected a different project on this device
     try{
       const raw = localStorage.getItem('debrief-supabase-config');
       if(raw){
@@ -483,7 +470,7 @@
           fetchEntries();
         }
       }
-    }catch(e){ /* no override saved, or storage unavailable */ }
+    }catch(e){ /* no config yet, or storage unavailable */ }
   }
 
   saveConfigBtn.addEventListener('click', async ()=>{
