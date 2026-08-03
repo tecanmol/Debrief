@@ -2,9 +2,8 @@ name: Month-end countdown notifier
 
 on:
   schedule:
-    # Runs daily at 08:00 UTC. GitHub Actions cron is always UTC —
-    # adjust the hour to match when you want the ping in your local time.
-    - cron: '0 8 * * *'
+    # 15:30 UTC = 9:00 PM IST (UTC+5:30). GitHub Actions cron is always UTC.
+    - cron: '30 15 * * *'
   workflow_dispatch:
     inputs:
       test:
