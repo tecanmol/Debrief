@@ -1,0 +1,39 @@
+name: Month-end countdown notifier
+
+on:
+  schedule:
+    # Runs daily at 08:00 UTC. GitHub Actions cron is always UTC —
+    # adjust the hour to match when you want the ping in your local time.
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+    inputs:
+      test:
+        description: 'Send a one-off test notification instead of the real countdown'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run notifier
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          if [ "${{ github.event.inputs.test }}" = "true" ]; then
+            python countdown.py --test
+          else
+            python countdown.py
+          fi
