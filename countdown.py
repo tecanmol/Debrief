@@ -8,7 +8,7 @@ import requests
 topic = os.environ.get("NTFY_TOPIC", "countInt-alertsApril")
 
 
-def send_ntfy(topic, message, title="Start Grinding"):
+def send_ntfy(topic, message, title="What did you do today??"):
     requests.post(
         f"https://ntfy.sh/{topic}",
         data=f"{message}".encode(encoding="utf-8"),
