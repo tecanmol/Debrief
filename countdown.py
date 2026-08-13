@@ -14,7 +14,7 @@ def send_ntfy(topic, message, title="What did you do today??"):
         data=f"{message}".encode(encoding="utf-8"),
         headers={
             "Title": title,
-            "Actions": "view, Debrief, https://tecanmol.github.io/Debrief/",
+            "Actions": "view, Debrief, https://debrief.localplayer.dev/",
         },
     )
 
